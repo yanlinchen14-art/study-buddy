@@ -14,6 +14,7 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [registered, setRegistered] = useState(false);
+  const [requiresEmailConfirmation, setRequiresEmailConfirmation] = useState(false);
   const { register, error } = useAuth();
   const router = useRouter();
 
@@ -45,10 +46,15 @@ export default function RegisterPage() {
     setIsSubmitting(true);
 
     try {
-      await register(email, password, username);
+      const result = await register(email, password, username);
+      setRequiresEmailConfirmation(result.requiresEmailConfirmation);
       setRegistered(true);
-      toast.success('注册成功！请检查邮箱以完成验证');
-      setTimeout(() => router.push('/auth/login'), 3000);
+      toast.success(
+        result.requiresEmailConfirmation
+          ? '注册成功！请检查邮箱完成验证'
+          : '注册成功！现在可以登录',
+      );
+      setTimeout(() => router.replace('/auth/login'), 2000);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : '注册失败，请重试');
     } finally {
@@ -64,10 +70,13 @@ export default function RegisterPage() {
             <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-gray-800 mb-2">注册成功！</h2>
             <p className="text-gray-600 mb-6">
-              验证邮件已发送到 <span className="font-semibold">{email}</span>
+              {requiresEmailConfirmation ? '验证邮件已发送到 ' : '账户邮箱：'}
+              <span className="font-semibold">{email}</span>
             </p>
             <p className="text-sm text-gray-500 mb-6">
-              请检查收件箱并点击验证链接以激活账户。3 秒后自动跳转到登录页...
+              {requiresEmailConfirmation
+                ? '请检查收件箱并点击验证链接以激活账户。2 秒后自动跳转到登录页...'
+                : '账户已经创建完成。2 秒后自动跳转到登录页...'}
             </p>
             <Link
               href="/auth/login"
