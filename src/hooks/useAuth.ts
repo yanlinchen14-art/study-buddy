@@ -75,12 +75,25 @@ export function useAuth() {
     // 监听认证状态变化
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
+    } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!isMounted) return;
 
       if (session?.user) {
-        setState(prev => ({ ...prev, user: session.user, error: null }));
-        await fetchUserProfile(session.user.id);
+        const currentUser = session.user;
+
+        setState(prev => ({
+          ...prev,
+          user: currentUser,
+          error: null,
+        }));
+
+        // 不要在 onAuthStateChange 回调里直接 await Supabase 请求，
+        // 否则可能造成 supabase-js 认证死锁，表现为“登录中...”一直不结束。
+        window.setTimeout(() => {
+          if (isMounted) {
+            void fetchUserProfile(currentUser.id);
+          }
+        }, 0);
       } else {
         setState(prev => ({
           ...prev,
@@ -114,21 +127,29 @@ export function useAuth() {
 
         if (error) throw error;
 
-        if (data.user) {
-          setState(prev => ({
-            ...prev,
-            user: data.user,
-            loading: false,
-          }));
+        if (!data.user) {
+          throw new Error('注册失败，未创建用户');
+        }
 
-          // 如果注册后已经有登录会话，再读取用户资料。
-          // 如果 Supabase 开启了邮箱验证，注册时通常还没有 session，
-          // 这时先等待用户验证并登录，避免被 RLS 拦截。
-          if (data.session) {
-            await fetchUserProfile(data.user.id);
-          }
-        } else {
-          setState(prev => ({ ...prev, loading: false }));
+        // Supabase 在邮箱确认开启时，为防止泄露“某邮箱是否已注册”，
+        // 对某些重复注册请求可能返回一个模糊用户对象而不直接报错。
+        if (
+          Array.isArray(data.user.identities) &&
+          data.user.identities.length === 0
+        ) {
+          throw new Error('该邮箱可能已经注册，请直接登录或使用其他邮箱');
+        }
+
+        setState(prev => ({
+          ...prev,
+          user: data.user,
+          loading: false,
+        }));
+
+        // 如果注册后已经有登录会话，再读取用户资料。
+        // 如果开启邮箱验证，通常 session 为 null，验证并登录后再读取即可。
+        if (data.session) {
+          await fetchUserProfile(data.user.id);
         }
       } catch (err) {
         setState(prev => ({
