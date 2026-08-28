@@ -115,23 +115,20 @@ export function useAuth() {
         if (error) throw error;
 
         if (data.user) {
-          // 创建用户档案
-          const { error: profileError } = await supabase.from('users').insert({
-            id: data.user.id,
-            username,
-            avatar_url: null,
-            bio: '',
-            learning_goals: '',
-            common_subjects: [],
-          });
-
-          if (profileError) throw profileError;
           setState(prev => ({
             ...prev,
             user: data.user,
             loading: false,
           }));
-          await fetchUserProfile(data.user.id);
+
+          // 如果注册后已经有登录会话，再读取用户资料。
+          // 如果 Supabase 开启了邮箱验证，注册时通常还没有 session，
+          // 这时先等待用户验证并登录，避免被 RLS 拦截。
+          if (data.session) {
+            await fetchUserProfile(data.user.id);
+          }
+        } else {
+          setState(prev => ({ ...prev, loading: false }));
         }
       } catch (err) {
         setState(prev => ({
@@ -201,8 +198,12 @@ export function useAuth() {
   const resetPassword = useCallback(async (email: string) => {
     setState(prev => ({ ...prev, loading: true, error: null }));
     try {
+      const siteUrl =
+        process.env.NEXT_PUBLIC_APP_URL ||
+        (typeof window !== 'undefined' ? window.location.origin : '');
+
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/reset-password`,
+        redirectTo: `${siteUrl}/auth/reset-password`,
       });
 
       if (error) throw error;
