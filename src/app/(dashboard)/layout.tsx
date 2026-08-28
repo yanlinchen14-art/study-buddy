@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { BottomNav } from '@/components/BottomNav';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertCircle } from 'lucide-react';
 
 export default function DashboardLayout({
   children,
@@ -13,43 +13,72 @@ export default function DashboardLayout({
 }) {
   const [isLoading, setIsLoading] = useState(true);
   const [spaceId, setSpaceId] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const router = useRouter();
+  const pathname = usePathname();
+  const isSpaceSettingsPage = pathname === '/settings/space';
 
   useEffect(() => {
+    let cancelled = false;
+
     const initDashboard = async () => {
+      setIsLoading(true);
+      setLoadError(null);
+
       try {
         const {
           data: { session },
+          error: sessionError,
         } = await supabase.auth.getSession();
 
+        if (sessionError) throw sessionError;
+        if (cancelled) return;
+
         if (!session?.user) {
-          router.push('/auth/login');
+          router.replace(`/auth/login?next=${encodeURIComponent(pathname)}`);
           return;
         }
 
-        // 获取用户的学习空间
-        const { data: members } = await supabase
+        // 这个页面本身就是给“还没有学习空间”的登录用户使用的，
+        // 因此不能先要求 spaceId 才允许它显示。
+        if (isSpaceSettingsPage) {
+          setIsLoading(false);
+          return;
+        }
+
+        const { data: members, error: memberError } = await supabase
           .from('study_space_members')
           .select('space_id')
           .eq('user_id', session.user.id)
           .limit(1);
 
-        if (members && members.length > 0) {
-          setSpaceId(members[0].space_id);
-        } else {
-          // 重定向到空间创建/绑定页面
-          router.push('/settings/space');
+        if (memberError) throw memberError;
+        if (cancelled) return;
+
+        if (!members || members.length === 0) {
+          setSpaceId(null);
+          setIsLoading(false);
+          router.replace('/settings/space');
+          return;
         }
+
+        setSpaceId(members[0].space_id);
+        setIsLoading(false);
       } catch (err) {
         console.error('Dashboard init error:', err);
-        router.push('/auth/login');
-      } finally {
-        setIsLoading(false);
+        if (!cancelled) {
+          setLoadError(err instanceof Error ? err.message : '页面初始化失败');
+          setIsLoading(false);
+        }
       }
     };
 
-    initDashboard();
-  }, [router]);
+    void initDashboard();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isSpaceSettingsPage, pathname, router]);
 
   if (isLoading) {
     return (
@@ -62,21 +91,33 @@ export default function DashboardLayout({
     );
   }
 
+  if (loadError) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 via-white to-purple-50 p-4">
+        <div className="max-w-md w-full bg-white rounded-2xl p-6 shadow-md">
+          <AlertCircle className="w-10 h-10 text-red-500 mx-auto mb-3" />
+          <h2 className="text-lg font-bold text-gray-800 text-center mb-2">页面初始化失败</h2>
+          <p className="text-sm text-red-600 break-words text-center">{loadError}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (isSpaceSettingsPage) {
+    return <>{children}</>;
+  }
+
   if (!spaceId) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 via-white to-purple-50">
-        <div className="text-center">
-          <p className="text-gray-600">重定向中...</p>
-        </div>
+        <p className="text-gray-600">正在进入学习空间设置...</p>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-purple-50">
-      <div className="max-w-md mx-auto pb-24 md:pb-0">
-        {children}
-      </div>
+      <div className="max-w-md mx-auto pb-24 md:pb-0">{children}</div>
       <BottomNav />
     </div>
   );
