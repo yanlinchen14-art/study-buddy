@@ -16,7 +16,7 @@ import toast from 'react-hot-toast';
 type Step = 'options' | 'create' | 'join';
 
 export default function SpaceSettingsPage() {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [step, setStep] = useState<Step>('options');
   const [spaceName, setSpaceName] = useState('');
   const [inviteCode, setInviteCode] = useState('');
@@ -32,15 +32,17 @@ export default function SpaceSettingsPage() {
 
     const checkSpace = async () => {
       try {
-        const { data: members } = await supabase
+        const { data: members, error: memberError } = await supabase
           .from('study_space_members')
           .select('space_id, study_spaces(name, invite_code)')
           .eq('user_id', user.id)
           .limit(1);
 
+        if (memberError) throw memberError;
+
         if (members && members.length > 0) {
           setExistingSpace(members[0]);
-          setTimeout(() => router.push('/'), 2000);
+          setTimeout(() => router.replace('/'), 1200);
         }
       } catch (err) {
         console.error('Failed to check space:', err);
@@ -50,11 +52,8 @@ export default function SpaceSettingsPage() {
     checkSpace();
   }, [user, router]);
 
-  const generateInviteCode = () => {
-    const code = Math.random().toString(36).substring(2, 8).toUpperCase();
-    setGeneratedCode(code);
-    return code;
-  };
+  const generateInviteCode = () =>
+    Math.random().toString(36).substring(2, 8).toUpperCase();
 
   const handleCreateSpace = async (e: FormEvent) => {
     e.preventDefault();
@@ -71,34 +70,31 @@ export default function SpaceSettingsPage() {
 
     try {
       const code = generatedCode || generateInviteCode();
+      if (!generatedCode) setGeneratedCode(code);
 
-      // 创建学习空间
-      const { data: space, error: spaceError } = await supabase
-        .from('study_spaces')
-        .insert({
-          name: spaceName.trim(),
-          invite_code: code,
-          created_by: user.id,
-        })
-        .select()
-        .single();
+      // 通过数据库事务函数同时创建空间和创建者成员关系，避免只创建一半。
+      const { data: createdRows, error: createError } = await supabase.rpc(
+        'create_study_space_with_owner',
+        {
+          p_name: spaceName.trim(),
+          p_invite_code: code,
+        },
+      );
 
-      if (spaceError) throw spaceError;
+      if (createError) throw createError;
 
-      // 将当前用户加入空间
-      const { error: memberError } = await supabase
-        .from('study_space_members')
-        .insert({
-          space_id: space.id,
-          user_id: user.id,
-          role: 'admin',
-        });
-
-      if (memberError) throw memberError;
+      const created = Array.isArray(createdRows) ? createdRows[0] : createdRows;
+      if (!created) throw new Error('创建失败，数据库未返回学习空间');
 
       toast.success('学习空间创建成功！');
-      setExistingSpace(space);
-      setTimeout(() => router.push('/'), 2000);
+      setExistingSpace({
+        space_id: created.space_id,
+        study_spaces: {
+          name: created.space_name,
+          invite_code: created.invite_code_out,
+        },
+      });
+      setTimeout(() => router.replace('/'), 1200);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : '创建失败';
       setError(errorMsg);
@@ -122,50 +118,26 @@ export default function SpaceSettingsPage() {
     setIsSubmitting(true);
 
     try {
-      // 查找邀请码对应的空间
-      const { data: spaces, error: findError } = await supabase
-        .from('study_spaces')
-        .select('*')
-        .eq('invite_code', inviteCode.trim().toUpperCase())
-        .single();
-
-      if (findError) throw new Error('邀请码不存在或已过期');
-
-      // 检查是否已加入
-      const { data: existing } = await supabase
-        .from('study_space_members')
-        .select('*')
-        .eq('space_id', spaces.id)
-        .eq('user_id', user.id);
-
-      if (existing && existing.length > 0) {
-        throw new Error('你已经是这个学习空间的成员了');
-      }
-
-      // 检查空间是否已有两个成员（只支持双人）
-      const { data: members } = await supabase
-        .from('study_space_members')
-        .select('*')
-        .eq('space_id', spaces.id);
-
-      if (members && members.length >= 2) {
-        throw new Error('这个学习空间已满');
-      }
-
-      // 将用户加入空间
-      const { error: joinError } = await supabase
-        .from('study_space_members')
-        .insert({
-          space_id: spaces.id,
-          user_id: user.id,
-          role: 'member',
-        });
+      // 通过数据库事务函数按邀请码加入，服务端会校验邀请码、人数上限和重复加入。
+      const { data: joinedRows, error: joinError } = await supabase.rpc(
+        'join_study_space_by_code',
+        { p_invite_code: inviteCode.trim().toUpperCase() },
+      );
 
       if (joinError) throw joinError;
 
+      const joined = Array.isArray(joinedRows) ? joinedRows[0] : joinedRows;
+      if (!joined) throw new Error('加入失败，数据库未返回学习空间');
+
       toast.success('成功加入学习空间！');
-      setExistingSpace(spaces);
-      setTimeout(() => router.push('/'), 2000);
+      setExistingSpace({
+        space_id: joined.space_id,
+        study_spaces: {
+          name: joined.space_name,
+          invite_code: joined.invite_code_out,
+        },
+      });
+      setTimeout(() => router.replace('/'), 1200);
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : '加入失败';
       setError(errorMsg);
@@ -174,6 +146,32 @@ export default function SpaceSettingsPage() {
       setIsSubmitting(false);
     }
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 via-white to-purple-50">
+        <Loader2 className="w-10 h-10 animate-spin text-orange-400" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4">
+        <div className="bg-white rounded-2xl p-6 shadow-md text-center">
+          <AlertCircle className="w-10 h-10 text-red-500 mx-auto mb-3" />
+          <p className="text-gray-700">登录会话不存在，请重新登录。</p>
+          <button
+            type="button"
+            onClick={() => router.replace('/auth/login')}
+            className="mt-4 px-5 py-2 bg-orange-400 text-white rounded-xl"
+          >
+            返回登录
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (existingSpace) {
     return (
@@ -205,6 +203,7 @@ export default function SpaceSettingsPage() {
             {/* Create Button */}
             <button
               onClick={() => {
+                setGeneratedCode(generateInviteCode());
                 setStep('create');
                 setError(null);
               }}
@@ -293,7 +292,7 @@ export default function SpaceSettingsPage() {
               <div className="flex gap-2">
                 <input
                   type="text"
-                  value={generatedCode || generateInviteCode()}
+                  value={generatedCode}
                   readOnly
                   className="flex-1 px-4 py-3 bg-gray-100 border border-gray-200 rounded-xl text-center font-mono text-lg font-bold text-gray-800"
                 />
