@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, FormEvent } from 'react';
+import { Suspense, useState, FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { Mail, Lock, Loader2, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-export default function LoginPage() {
+function LoginContent() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -34,7 +34,6 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-purple-50 flex items-center justify-center px-4 py-8">
       <div className="w-full max-w-md">
-        {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold bg-gradient-to-r from-orange-400 to-purple-400 bg-clip-text text-transparent">
             Study Buddy
@@ -42,7 +41,6 @@ export default function LoginPage() {
           <p className="text-gray-500 mt-2">温柔的学习陪伴空间</p>
         </div>
 
-        {/* Form Card */}
         <div className="bg-white rounded-3xl shadow-lg shadow-purple-100 p-8">
           <h2 className="text-2xl font-bold text-gray-800 mb-6">登录</h2>
 
@@ -54,7 +52,6 @@ export default function LoginPage() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Email */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 邮箱
@@ -73,7 +70,6 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Password */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 密码
@@ -92,7 +88,6 @@ export default function LoginPage() {
               </div>
             </div>
 
-            {/* Forgot Password Link */}
             <div className="text-right">
               <Link
                 href="/auth/reset-password"
@@ -102,7 +97,6 @@ export default function LoginPage() {
               </Link>
             </div>
 
-            {/* Submit Button */}
             <button
               type="submit"
               disabled={isSubmitting || !email || !password}
@@ -119,18 +113,7 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Register Link */}
           <p className="text-center text-gray-600 mt-6">
             还没有账户？{' '}
             <Link
-              href="/auth/register"
-              className="text-orange-500 hover:text-orange-600 font-semibold transition"
-            >
-              立即注册
-            </Link>
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
+             
