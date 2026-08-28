@@ -34,6 +34,7 @@ function LoginContent() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-purple-50 flex items-center justify-center px-4 py-8">
       <div className="w-full max-w-md">
+        {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold bg-gradient-to-r from-orange-400 to-purple-400 bg-clip-text text-transparent">
             Study Buddy
@@ -41,6 +42,7 @@ function LoginContent() {
           <p className="text-gray-500 mt-2">温柔的学习陪伴空间</p>
         </div>
 
+        {/* Form Card */}
         <div className="bg-white rounded-3xl shadow-lg shadow-purple-100 p-8">
           <h2 className="text-2xl font-bold text-gray-800 mb-6">登录</h2>
 
@@ -52,6 +54,7 @@ function LoginContent() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
+            {/* Email */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 邮箱
@@ -70,6 +73,7 @@ function LoginContent() {
               </div>
             </div>
 
+            {/* Password */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 密码
@@ -88,6 +92,7 @@ function LoginContent() {
               </div>
             </div>
 
+            {/* Forgot Password Link */}
             <div className="text-right">
               <Link
                 href="/auth/reset-password"
@@ -97,6 +102,7 @@ function LoginContent() {
               </Link>
             </div>
 
+            {/* Submit Button */}
             <button
               type="submit"
               disabled={isSubmitting || !email || !password}
@@ -113,7 +119,26 @@ function LoginContent() {
             </button>
           </form>
 
+          {/* Register Link */}
           <p className="text-center text-gray-600 mt-6">
             还没有账户？{' '}
             <Link
-             
+              href="/auth/register"
+              className="text-orange-500 hover:text-orange-600 font-semibold transition"
+            >
+              立即注册
+            </Link>
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginContent />
+    </Suspense>
+  );
+}
