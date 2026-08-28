@@ -1,0 +1,70 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  @apply box-border;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-white text-gray-800;
+  font-feature-settings: "rlig" 1, "calt" 1;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  @apply w-2 h-2;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-gray-100;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-gray-300 rounded;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-gray-400;
+}
+
+/* Soft animations */
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-in-out;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+
+  .card-soft {
+    @apply rounded-2xl bg-white shadow-soft border border-gray-100;
+  }
+
+  .btn-soft {
+    @apply px-4 py-2 rounded-xl font-medium transition-all duration-200 ease-out hover:shadow-soft-md;
+  }
+
+  .btn-primary {
+    @apply btn-soft bg-gradient-to-r from-mint-400 to-mint-500 text-white hover:from-mint-500 hover:to-mint-600;
+  }
+
+  .btn-secondary {
+    @apply btn-soft bg-gray-100 text-gray-700 hover:bg-gray-200;
+  }
+
+  .input-soft {
+    @apply w-full px-4 py-3 rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-mint-300 focus:border-transparent transition-all;
+  }
+}
+
+/* Loading skeleton */
+.skeleton {
+  @apply bg-gradient-to-r from-gray-200 via-gray-100 to-gray-200 animate-pulse;
+  background-size: 200%;
+}
